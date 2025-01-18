@@ -1,0 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.test = void 0;
+const filter_1 = require("./filter");
+const test = (ast, subject) => {
+    return (0, filter_1.filter)(ast, [subject]).length === 1;
+};
+exports.test = test;
