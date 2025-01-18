@@ -52,7 +52,7 @@ export const createStringTest = (regexCache: RegExpCache, ast: LiqeQuery) => {
   } else {
     return createRegexTest(
       regexCache,
-      '/(' + escapeRegexString(value) + ')/' + (expression.quoted ? 'u' : 'ui'),
+      '/(' + escapeRegexString(value) + ')/' + 'ui',
     );
   }
 };
