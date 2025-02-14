@@ -112,7 +112,13 @@ export const createStringTest = (
 
   // If accent-insensitive, normalize both the pattern and subject for comparison
   if (options.accentSensitive === false) {
-    const normalizedPattern = normalizeString(pattern);
+    // First normalize the value before converting to pattern
+    const normalizedValue = normalizeString(value);
+    const normalizedPattern = convertToRegexPattern(
+      normalizedValue,
+      expression.quoted
+    );
+
     return (subject: unknown): boolean | string => {
       if (typeof subject !== "string") return false;
       const normalizedSubject = normalizeString(subject);
