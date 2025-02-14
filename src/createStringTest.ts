@@ -60,36 +60,6 @@ const normalizeString = (str: string): string => {
   }
 };
 
-const createNormalizedTest = (pattern: string, flags: string): InternalTest => {
-  let rule: RegExp;
-  try {
-    rule = new RegExp(pattern, flags);
-  } catch (e) {
-    console.error("Failed to create normalized regex:", e);
-    return () => false;
-  }
-
-  console.log(
-    "Creating normalized test with pattern:",
-    pattern,
-    "flags:",
-    flags,
-    "rule:",
-    rule
-  );
-
-  return (subject: unknown): boolean | string => {
-    if (typeof subject !== "string") return false;
-    try {
-      const normalizedSubject = normalizeString(subject);
-      return getMatchedText(normalizedSubject, rule);
-    } catch (e) {
-      console.error("Failed to execute normalized regex:", e);
-      return false;
-    }
-  };
-};
-
 const convertToRegexPattern = (value: string, quoted: boolean): string => {
   if (value.includes("*") || value.includes("?")) {
     if (!quoted) {
@@ -138,14 +108,22 @@ export const createStringTest = (
     flags
   );
 
-  // If accent-insensitive, normalize the search value and wrap the regex to normalize the subject
+  const pattern = convertToRegexPattern(value, expression.quoted);
+
+  // If accent-insensitive, normalize both the pattern and subject for comparison
   if (options.accentSensitive === false) {
-    const normalizedValue = normalizeString(value);
-    const pattern = convertToRegexPattern(normalizedValue, expression.quoted);
-    return createNormalizedTest(pattern, flags);
+    const normalizedPattern = normalizeString(pattern);
+    return (subject: unknown): boolean | string => {
+      if (typeof subject !== "string") return false;
+      const normalizedSubject = normalizeString(subject);
+      return createRegexTest(
+        regexCache,
+        normalizedPattern,
+        flags
+      )(normalizedSubject);
+    };
   }
 
   // Default accent-sensitive behavior
-  const pattern = convertToRegexPattern(value, expression.quoted);
   return createRegexTest(regexCache, pattern, flags);
 };
