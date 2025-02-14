@@ -5,23 +5,40 @@ import { type LiqeQuery, type LiqeOptions } from "./types";
 
 type RegExpCache = Record<string, RegExp>;
 
-const createRegexTest = (regexCache: RegExpCache, regex: string) => {
+const createRegexTest = (
+  regexCache: RegExpCache,
+  pattern: string,
+  flags: string
+) => {
+  const regexStr = "/" + pattern + "/" + flags;
   let rule: RegExp;
 
-  if (regexCache[regex]) {
-    rule = regexCache[regex];
+  if (regexCache[regexStr]) {
+    rule = regexCache[regexStr];
   } else {
-    rule = parseRegex(regex);
-    regexCache[regex] = rule;
+    rule = parseRegex(regexStr);
+    regexCache[regexStr] = rule;
   }
 
   return (subject: string): false | string => {
-    return subject.match(rule)?.[0] ?? false;
+    const match = rule.exec(subject);
+    return match?.[0] ?? false;
   };
 };
 
 const normalizeString = (str: string): string => {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
+
+const createNormalizedTest = (pattern: string, flags: string) => {
+  const regexStr = "/" + pattern + "/" + flags;
+  const rule = parseRegex(regexStr);
+
+  return (subject: string): false | string => {
+    const normalizedSubject = normalizeString(subject);
+    const match = rule.exec(normalizedSubject);
+    return match?.[0] ?? false;
+  };
 };
 
 export const createStringTest = (
@@ -40,7 +57,11 @@ export const createStringTest = (
   }
 
   if (expression.type === "RegexExpression") {
-    return createRegexTest(regexCache, expression.value);
+    return createRegexTest(
+      regexCache,
+      expression.value,
+      options.caseSensitive ? "u" : "ui"
+    );
   }
 
   if (expression.type !== "LiteralExpression") {
@@ -57,17 +78,11 @@ export const createStringTest = (
       (value.includes("*") || value.includes("?")) &&
       expression.quoted === false
     ) {
-      const regex = String(convertWildcardToRegex(normalizedValue)) + flags;
-      return (subject: string): false | string => {
-        const normalizedSubject = normalizeString(subject);
-        return normalizedSubject.match(parseRegex(regex))?.[0] ?? false;
-      };
+      const pattern = convertWildcardToRegex(normalizedValue);
+      return createNormalizedTest(pattern, flags);
     } else {
-      const regex = "/(" + escapeRegexString(normalizedValue) + ")/" + flags;
-      return (subject: string): false | string => {
-        const normalizedSubject = normalizeString(subject);
-        return normalizedSubject.match(parseRegex(regex))?.[0] ?? false;
-      };
+      const pattern = "(" + escapeRegexString(normalizedValue) + ")";
+      return createNormalizedTest(pattern, flags);
     }
   }
 
@@ -76,14 +91,10 @@ export const createStringTest = (
     (value.includes("*") || value.includes("?")) &&
     expression.quoted === false
   ) {
-    return createRegexTest(
-      regexCache,
-      String(convertWildcardToRegex(value)) + flags
-    );
+    const pattern = convertWildcardToRegex(value);
+    return createRegexTest(regexCache, pattern, flags);
   } else {
-    return createRegexTest(
-      regexCache,
-      "/(" + escapeRegexString(value) + ")/" + flags
-    );
+    const pattern = "(" + escapeRegexString(value) + ")";
+    return createRegexTest(regexCache, pattern, flags);
   }
 };
