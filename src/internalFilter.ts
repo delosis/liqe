@@ -1,26 +1,30 @@
-import { createStringTest } from './createStringTest';
-import { testComparisonRange } from './testComparisonRange';
-import { testRange } from './testRange';
+import { createStringTest } from "./createStringTest";
+import { testComparisonRange } from "./testComparisonRange";
+import { testRange } from "./testRange";
 import {
   type InternalHighlight,
   type InternalTest,
   type LiqeQuery,
-} from './types';
+  type LiqeOptions,
+} from "./types";
 
-const createValueTest = (ast: LiqeQuery): InternalTest => {
-  if (ast.type !== 'Tag') {
-    throw new Error('Expected a tag expression.');
+const createValueTest = (
+  ast: LiqeQuery,
+  options: LiqeOptions
+): InternalTest => {
+  if (ast.type !== "Tag") {
+    throw new Error("Expected a tag expression.");
   }
 
   const { expression } = ast;
 
-  if (expression.type === 'RangeExpression') {
+  if (expression.type === "RangeExpression") {
     return (value) => {
       return testRange(value, expression.range);
     };
   }
 
-  if (expression.type === 'EmptyExpression') {
+  if (expression.type === "EmptyExpression") {
     return () => {
       return false;
     };
@@ -28,21 +32,21 @@ const createValueTest = (ast: LiqeQuery): InternalTest => {
 
   const expressionValue = expression.value;
 
-  if (ast.operator && ast.operator.operator !== ':') {
+  if (ast.operator && ast.operator.operator !== ":") {
     const operator = ast.operator;
 
-    if (typeof expressionValue !== 'number') {
-      throw new TypeError('Expected a number.');
+    if (typeof expressionValue !== "number") {
+      throw new TypeError("Expected a number.");
     }
 
     return (value) => {
-      if (typeof value !== 'number') {
+      if (typeof value !== "number") {
         return false;
       }
 
       return testComparisonRange(expressionValue, value, operator.operator);
     };
-  } else if (typeof expressionValue === 'boolean') {
+  } else if (typeof expressionValue === "boolean") {
     return (value) => {
       return value === expressionValue;
     };
@@ -51,7 +55,7 @@ const createValueTest = (ast: LiqeQuery): InternalTest => {
       return value === null;
     };
   } else {
-    const testString = createStringTest({}, ast);
+    const testString = createStringTest({}, ast, options);
 
     return (value) => {
       return testString(String(value));
@@ -64,7 +68,7 @@ const testValue = (
   value: unknown,
   resultFast: boolean,
   path: readonly string[],
-  highlights: InternalHighlight[],
+  highlights: InternalHighlight[]
 ) => {
   if (Array.isArray(value)) {
     let foundMatch = false;
@@ -83,7 +87,7 @@ const testValue = (
     }
 
     return foundMatch;
-  } else if (typeof value === 'object' && value !== null) {
+  } else if (typeof value === "object" && value !== null) {
     let foundMatch = false;
 
     for (const key in value) {
@@ -99,20 +103,20 @@ const testValue = (
     return foundMatch;
   }
 
-  if (ast.type !== 'Tag') {
-    throw new Error('Expected a tag expression.');
+  if (ast.type !== "Tag") {
+    throw new Error("Expected a tag expression.");
   }
 
   if (!ast.test) {
-    throw new Error('Expected test to be defined.');
+    throw new Error("Expected test to be defined.");
   }
 
   const result = ast.test(value);
 
   if (result) {
     highlights.push({
-      ...(typeof result === 'string' && { keyword: result }),
-      path: path.join('.'),
+      ...(typeof result === "string" && { keyword: result }),
+      path: path.join("."),
     });
 
     return true;
@@ -127,16 +131,17 @@ const testField = <T extends Object>(
   resultFast: boolean,
   path: readonly string[],
   highlights: InternalHighlight[],
+  options: LiqeOptions
 ): boolean => {
-  if (ast.type !== 'Tag') {
-    throw new Error('Expected a tag expression.');
+  if (ast.type !== "Tag") {
+    throw new Error("Expected a tag expression.");
   }
 
   if (!ast.test) {
-    ast.test = createValueTest(ast);
+    ast.test = createValueTest(ast, options);
   }
 
-  if (ast.field.type === 'ImplicitField') {
+  if (ast.field.type === "ImplicitField") {
     let foundMatch = false;
 
     for (const fieldName in row) {
@@ -151,14 +156,14 @@ const testField = <T extends Object>(
               },
               name: fieldName,
               quoted: true,
-              quotes: 'double',
-              type: 'Field',
+              quotes: "double",
+              type: "Field",
             },
           },
           row[fieldName],
           resultFast,
           [...path, fieldName],
-          highlights,
+          highlights
         )
       ) {
         if (resultFast) {
@@ -180,13 +185,13 @@ const testField = <T extends Object>(
       ast.getValue(row),
       resultFast,
       ast.field.path,
-      highlights,
+      highlights
     );
   } else if (ast.field.path) {
     let value = row;
 
     for (const key of ast.field.path) {
-      if (typeof value !== 'object' || value === null) {
+      if (typeof value !== "object" || value === null) {
         return false;
       } else if (key in value) {
         value = value[key];
@@ -207,58 +212,89 @@ export const internalFilter = <T extends Object>(
   resultFast: boolean = true,
   path: readonly string[] = [],
   highlights: InternalHighlight[] = [],
+  options: LiqeOptions = {}
 ): readonly T[] => {
-  if (ast.type === 'Tag') {
+  if (ast.type === "Tag") {
     return rows.filter((row) => {
       return testField(
         row,
         ast,
         resultFast,
-        ast.field.type === 'ImplicitField' ? path : [...path, ast.field.name],
+        ast.field.type === "ImplicitField" ? path : [...path, ast.field.name],
         highlights,
+        options
       );
     });
   }
 
-  if (ast.type === 'UnaryOperator') {
-    const removeRows = internalFilter(ast.operand, rows, resultFast, path, []);
+  if (ast.type === "UnaryOperator") {
+    const removeRows = internalFilter(
+      ast.operand,
+      rows,
+      resultFast,
+      path,
+      [],
+      options
+    );
 
     return rows.filter((row) => {
       return !removeRows.includes(row);
     });
   }
 
-  if (ast.type === 'ParenthesizedExpression') {
-    return internalFilter(ast.expression, rows, resultFast, path, highlights);
+  if (ast.type === "ParenthesizedExpression") {
+    return internalFilter(
+      ast.expression,
+      rows,
+      resultFast,
+      path,
+      highlights,
+      options
+    );
   }
 
   if (!ast.left) {
-    throw new Error('Expected left to be defined.');
+    throw new Error("Expected left to be defined.");
   }
 
-  const leftRows = internalFilter(ast.left, rows, resultFast, path, highlights);
+  const leftRows = internalFilter(
+    ast.left,
+    rows,
+    resultFast,
+    path,
+    highlights,
+    options
+  );
 
   if (!ast.right) {
-    throw new Error('Expected right to be defined.');
+    throw new Error("Expected right to be defined.");
   }
 
-  if (ast.type !== 'LogicalExpression') {
-    throw new Error('Expected a tag expression.');
+  if (ast.type !== "LogicalExpression") {
+    throw new Error("Expected a tag expression.");
   }
 
-  if (ast.operator.operator === 'OR') {
+  if (ast.operator.operator === "OR") {
     const rightRows = internalFilter(
       ast.right,
       rows,
       resultFast,
       path,
       highlights,
+      options
     );
 
     return Array.from(new Set([...leftRows, ...rightRows]));
-  } else if (ast.operator.operator === 'AND') {
-    return internalFilter(ast.right, leftRows, resultFast, path, highlights);
+  } else if (ast.operator.operator === "AND") {
+    return internalFilter(
+      ast.right,
+      leftRows,
+      resultFast,
+      path,
+      highlights,
+      options
+    );
   }
 
-  throw new Error('Unexpected state.');
+  throw new Error("Unexpected state.");
 };

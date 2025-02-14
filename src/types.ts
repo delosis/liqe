@@ -1,20 +1,20 @@
 export type BooleanOperatorToken = {
   location: TokenLocation;
-  operator: 'AND' | 'OR';
-  type: 'BooleanOperator';
+  operator: "AND" | "OR";
+  type: "BooleanOperator";
 };
 
-export type ComparisonOperator = ':' | ':<' | ':<=' | ':=' | ':>' | ':>=';
+export type ComparisonOperator = ":" | ":<" | ":<=" | ":=" | ":>" | ":>=";
 
 export type ComparisonOperatorToken = {
   location: TokenLocation;
   operator: ComparisonOperator;
-  type: 'ComparisonOperator';
+  type: "ComparisonOperator";
 };
 
 export type EmptyExpression = {
   location: TokenLocation;
-  type: 'EmptyExpression';
+  type: "EmptyExpression";
 };
 
 export type ExpressionToken =
@@ -27,14 +27,14 @@ export type FieldToken = {
   location: TokenLocation;
   name: string;
   path?: readonly string[];
-  type: 'Field';
+  type: "Field";
 } & (
   | {
       quoted: false;
     }
   | {
       quoted: true;
-      quotes: 'double' | 'single';
+      quotes: "double" | "single";
     }
 );
 
@@ -46,12 +46,12 @@ export type Highlight = {
 // Implicit boolean operators do not have a location, e.g., "foo bar".
 // In this example, the implicit AND operator is the space between "foo" and "bar".
 export type ImplicitBooleanOperatorToken = {
-  operator: 'AND';
-  type: 'ImplicitBooleanOperator';
+  operator: "AND";
+  type: "ImplicitBooleanOperator";
 };
 
 export type ImplicitFieldToken = {
-  type: 'ImplicitField';
+  type: "ImplicitField";
 };
 
 export type InternalHighlight = {
@@ -70,7 +70,7 @@ export type LiqeQuery = ParserAst & {
 
 export type LiteralExpressionToken = {
   location: TokenLocation;
-  type: 'LiteralExpression';
+  type: "LiteralExpression";
 } & (
   | {
       quoted: false;
@@ -78,7 +78,7 @@ export type LiteralExpressionToken = {
     }
   | {
       quoted: true;
-      quotes: 'double' | 'single';
+      quotes: "double" | "single";
       value: string;
     }
 );
@@ -88,13 +88,13 @@ export type LogicalExpressionToken = {
   location: TokenLocation;
   operator: BooleanOperatorToken | ImplicitBooleanOperatorToken;
   right: ParserAst;
-  type: 'LogicalExpression';
+  type: "LogicalExpression";
 };
 
 export type ParenthesizedExpressionToken = {
   expression: ParserAst;
   location: TokenLocation;
-  type: 'ParenthesizedExpression';
+  type: "ParenthesizedExpression";
 };
 
 export type ParserAst =
@@ -114,12 +114,12 @@ export type Range = {
 export type RangeExpressionToken = {
   location: TokenLocation;
   range: Range;
-  type: 'RangeExpression';
+  type: "RangeExpression";
 };
 
 export type RegexExpressionToken = {
   location: TokenLocation;
-  type: 'RegexExpression';
+  type: "RegexExpression";
   value: string;
 };
 
@@ -129,7 +129,7 @@ export type TagToken = {
   location: TokenLocation;
   operator: ComparisonOperatorToken;
   test?: InternalTest;
-  type: 'Tag';
+  type: "Tag";
 };
 
 export type TokenLocation = {
@@ -140,6 +140,11 @@ export type TokenLocation = {
 export type UnaryOperatorToken = {
   location: TokenLocation;
   operand: ParserAst;
-  operator: '-' | 'NOT';
-  type: 'UnaryOperator';
+  operator: "-" | "NOT";
+  type: "UnaryOperator";
 };
+
+export interface LiqeOptions {
+  caseSensitive?: boolean;
+  accentSensitive?: boolean;
+}
