@@ -70,37 +70,40 @@ const testValue = (
   path: readonly string[],
   highlights: InternalHighlight[]
 ) => {
-  if (Array.isArray(value)) {
-    let foundMatch = false;
-    let index = 0;
+  // No early return for primitives - let the test function handle type coercion
 
-    for (const item of value) {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
       if (
-        testValue(ast, item, resultFast, [...path, String(index++)], highlights)
+        testValue(ast, value[i], resultFast, [...path, String(i)], highlights)
       ) {
+        // Early return for fast mode
         if (resultFast) {
           return true;
         }
-
-        foundMatch = true;
+        // Only continue if we need all matches for highlighting
+        if (!highlights) {
+          return true;
+        }
       }
     }
+    return false;
+  }
 
-    return foundMatch;
-  } else if (typeof value === "object" && value !== null) {
-    let foundMatch = false;
-
+  if (typeof value === "object" && value !== null) {
     for (const key in value) {
       if (testValue(ast, value[key], resultFast, [...path, key], highlights)) {
+        // Early return for fast mode
         if (resultFast) {
           return true;
         }
-
-        foundMatch = true;
+        // Only continue if we need all matches for highlighting
+        if (!highlights) {
+          return true;
+        }
       }
     }
-
-    return foundMatch;
+    return false;
   }
 
   if (ast.type !== "Tag") {
@@ -113,13 +116,11 @@ const testValue = (
 
   const result = ast.test(value);
 
-  if (result) {
+  if (result && highlights) {
     highlights.push({
       ...(typeof result === "string" && { keyword: result }),
       path: path.join("."),
     });
-
-    return true;
   }
 
   return Boolean(result);
@@ -142,39 +143,35 @@ const testField = <T extends Object>(
   }
 
   if (ast.field.type === "ImplicitField") {
-    let foundMatch = false;
-
+    // For implicit fields, test each field until we find a match
     for (const fieldName in row) {
+      const fieldAst: LiqeQuery = {
+        ...ast,
+        field: {
+          location: { end: -1, start: -1 },
+          name: fieldName,
+          quoted: true,
+          quotes: "double" as const,
+          type: "Field" as const,
+        },
+      };
+
       if (
         testValue(
-          {
-            ...ast,
-            field: {
-              location: {
-                end: -1,
-                start: -1,
-              },
-              name: fieldName,
-              quoted: true,
-              quotes: "double",
-              type: "Field",
-            },
-          },
+          fieldAst,
           row[fieldName],
           resultFast,
           [...path, fieldName],
           highlights
         )
       ) {
-        if (resultFast) {
+        // Early return if we don't need highlights
+        if (resultFast || !highlights) {
           return true;
         }
-
-        foundMatch = true;
       }
     }
-
-    return foundMatch;
+    return false;
   }
 
   if (ast.field.name in row) {
@@ -206,6 +203,42 @@ const testField = <T extends Object>(
   }
 };
 
+const shouldProcessRecord = <T extends Object>(
+  ast: LiqeQuery,
+  row: T,
+  options: LiqeOptions
+): boolean => {
+  // Only optimize string searches with case/accent sensitivity
+  if (
+    ast.type === "Tag" &&
+    ast.field.type !== "ImplicitField" &&
+    (options.caseSensitive || options.accentSensitive) &&
+    ast.expression.type === "LiteralExpression" &&
+    ast.expression.value !== null &&
+    typeof ast.expression.value === "string"
+  ) {
+    const fieldValue = String(row[ast.field.name] ?? "").toLowerCase();
+    const searchValue = ast.expression.value.toLowerCase();
+
+    // Quick check - if the field doesn't contain any character from the search term
+    // in any case, it can't possibly match
+    const searchChars = new Set(searchValue.split(""));
+    const fieldChars = new Set(fieldValue.split(""));
+
+    let hasCommonChar = false;
+    for (const char of searchChars) {
+      if (fieldChars.has(char)) {
+        hasCommonChar = true;
+        break;
+      }
+    }
+    if (!hasCommonChar) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export const internalFilter = <T extends Object>(
   ast: LiqeQuery,
   rows: readonly T[],
@@ -216,6 +249,10 @@ export const internalFilter = <T extends Object>(
 ): readonly T[] => {
   if (ast.type === "Tag") {
     return rows.filter((row) => {
+      // Quick check if we should process this record
+      if (!shouldProcessRecord(ast, row, options)) {
+        return false;
+      }
       return testField(
         row,
         ast,
