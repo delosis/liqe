@@ -24,7 +24,6 @@ const createRegexTest = (regexCache, pattern, flags) => {
             return () => false;
         }
     }
-    console.log("Creating regex test with pattern:", pattern, "flags:", flags, "rule:", rule);
     return (subject) => {
         if (typeof subject !== "string")
             return false;
@@ -40,36 +39,12 @@ const createRegexTest = (regexCache, pattern, flags) => {
 const normalizeString = (str) => {
     try {
         const normalized = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        console.log("Normalizing string:", str, "result:", normalized);
         return normalized;
     }
     catch (e) {
         console.error("Failed to normalize string:", e);
         return str;
     }
-};
-const createNormalizedTest = (pattern, flags) => {
-    let rule;
-    try {
-        rule = new RegExp(pattern, flags);
-    }
-    catch (e) {
-        console.error("Failed to create normalized regex:", e);
-        return () => false;
-    }
-    console.log("Creating normalized test with pattern:", pattern, "flags:", flags, "rule:", rule);
-    return (subject) => {
-        if (typeof subject !== "string")
-            return false;
-        try {
-            const normalizedSubject = normalizeString(subject);
-            return getMatchedText(normalizedSubject, rule);
-        }
-        catch (e) {
-            console.error("Failed to execute normalized regex:", e);
-            return false;
-        }
-    };
 };
 const convertToRegexPattern = (value, quoted) => {
     if (value.includes("*") || value.includes("?")) {
@@ -96,15 +71,20 @@ const createStringTest = (regexCache, ast, options = {}) => {
     }
     const value = String(expression.value);
     const flags = options.caseSensitive ? "u" : "ui";
-    console.log("Creating string test with options:", options, "value:", value, "flags:", flags);
-    // If accent-insensitive, normalize the search value and wrap the regex to normalize the subject
+    const pattern = convertToRegexPattern(value, expression.quoted);
+    // If accent-insensitive, normalize both the pattern and subject for comparison
     if (options.accentSensitive === false) {
+        // First normalize the value before converting to pattern
         const normalizedValue = normalizeString(value);
-        const pattern = convertToRegexPattern(normalizedValue, expression.quoted);
-        return createNormalizedTest(pattern, flags);
+        const normalizedPattern = convertToRegexPattern(normalizedValue, expression.quoted);
+        return (subject) => {
+            if (typeof subject !== "string")
+                return false;
+            const normalizedSubject = normalizeString(subject);
+            return createRegexTest(regexCache, normalizedPattern, flags)(normalizedSubject);
+        };
     }
     // Default accent-sensitive behavior
-    const pattern = convertToRegexPattern(value, expression.quoted);
     return createRegexTest(regexCache, pattern, flags);
 };
 exports.createStringTest = createStringTest;

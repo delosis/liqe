@@ -30,14 +30,6 @@ const createRegexTest = (
     }
   }
 
-  console.log(
-    "Creating regex test with pattern:",
-    pattern,
-    "flags:",
-    flags,
-    "rule:",
-    rule
-  );
   return (subject: unknown): boolean | string => {
     if (typeof subject !== "string") return false;
     try {
@@ -52,7 +44,6 @@ const createRegexTest = (
 const normalizeString = (str: string): string => {
   try {
     const normalized = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    console.log("Normalizing string:", str, "result:", normalized);
     return normalized;
   } catch (e) {
     console.error("Failed to normalize string:", e);
@@ -99,19 +90,11 @@ export const createStringTest = (
 
   const value = String(expression.value);
   const flags = options.caseSensitive ? "u" : "ui";
-  console.log(
-    "Creating string test with options:",
-    options,
-    "value:",
-    value,
-    "flags:",
-    flags
-  );
 
   const pattern = convertToRegexPattern(value, expression.quoted);
 
-  // If accent-insensitive, normalize both the pattern and subject for comparison
-  if (options.accentSensitive === false) {
+  // Default to accent-insensitive unless explicitly set to true
+  if (options.accentSensitive !== true) {
     // First normalize the value before converting to pattern
     const normalizedValue = normalizeString(value);
     const normalizedPattern = convertToRegexPattern(
